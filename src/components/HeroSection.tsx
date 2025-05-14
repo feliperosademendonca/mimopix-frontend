@@ -1,7 +1,6 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Gift, ArrowRight } from "lucide-react";
+import { Gift, ArrowRight, Ticket } from "lucide-react";
 
 const HeroSection = () => {
   return (
