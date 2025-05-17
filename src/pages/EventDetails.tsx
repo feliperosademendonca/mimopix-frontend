@@ -1,401 +1,572 @@
 
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Share, Calendar, PiggyBank, Ticket, Gift, User } from "lucide-react";
-import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { EventType } from "@/components/EventCard";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Gift, 
+  Ticket, 
+  Percent, 
+  Share2, 
+  Key, 
+  ArrowRight, 
+  CreditCard, 
+  Calendar, 
+  Clock,
+  Check,
+  User
+} from "lucide-react";
+import EventProgressBar from "@/components/EventProgressBar";
 
-// Sample data for events (same as in Events.tsx)
-const eventsData = [
-  {
+// Mock event data for the demo
+const mockEvents = {
+  "1": {
     id: "1",
-    title: "Chá de Bebê do Miguel",
-    image: "https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&w=600&h=300",
-    type: "vaquinha" as EventType,
-    endDate: new Date(2025, 5, 30),
-    goal: 2000,
-    progress: 1200,
-    creator: "Ana Silva",
-    description: "Ajude-nos a preparar a chegada do Miguel com todo o carinho que ele merece! Estamos arrecadando fundos para comprar o enxoval e os móveis para o quartinho dele.",
-    pixKey: "anasilva@email.com"
+    title: "Chá de Bebê da Maria",
+    type: "presente",
+    date: "2025-06-15",
+    description: "Venha celebrar a chegada da nossa pequena Maria com muita alegria e carinho!",
+    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158",
+    progress: 45,
+    currentValue: 550,
+    targetValue: 1200,
+    pixKey: "maria@example.com",
+    host: "Ana e João",
+    customColors: {
+      primaryColor: "#FFDAB9",
+      secondaryColor: "#CFB53B",
+      accentColor: "#98FB98",
+      backgroundColor: "#F8F8F8"
+    },
+    celebrationName: "Maria",
+    celebrationType: "Chá de Bebê",
+    gifts: [
+      {
+        name: "Carrinho de Bebê",
+        value: 800,
+        shares: 8,
+        shareValue: 100,
+        sharesTaken: 3
+      },
+      {
+        name: "Kit Berço",
+        value: 400,
+        shares: 4,
+        shareValue: 100,
+        sharesTaken: 2
+      }
+    ]
   },
-  {
+  "2": {
     id: "2",
-    title: "Rifa Beneficente para Tratamento da Laura",
-    image: "https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&w=600&h=300",
-    type: "rifa" as EventType,
-    endDate: new Date(2025, 6, 15),
-    ticketPrice: 15,
-    creator: "Carlos Oliveira",
-    description: "A Laura está precisando de um tratamento especial e estamos rifando um smartphone novinho para ajudar nas despesas. Participe e concorra!",
-    pixKey: "carlosoliveira@email.com",
-    prize: "Smartphone Samsung Galaxy S23",
-    totalTickets: 200,
-    availableTickets: 120
+    title: "Rifa Beneficente",
+    type: "rifa",
+    date: "2025-07-20",
+    description: "Rifa para arrecadação de fundos para a reforma da escola comunitária. O prêmio é um smartphone último modelo!",
+    image: "https://images.unsplash.com/photo-1517022812141-23620dba5c23",
+    progress: 42,
+    currentValue: 42,
+    targetValue: 100,
+    pixKey: "escola@example.com",
+    host: "Associação de Pais",
+    customColors: {
+      primaryColor: "#E0B4B4",
+      secondaryColor: "#5F9EA0",
+      accentColor: "#FFDEAD",
+      backgroundColor: "#F5F5DC"
+    },
+    prize: "Smartphone Samsung Galaxy S25",
+    ticketPrice: 20
   },
-  {
+  "3": {
     id: "3",
-    title: "Presente de Casamento - Aspirador Robot",
-    image: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?auto=format&fit=crop&w=600&h=300",
-    type: "presente" as EventType,
-    endDate: new Date(2025, 7, 10),
-    giftValue: 1200,
-    creator: "Juliana e Marcos",
-    description: "Estamos nos casando e sonhamos com um aspirador robô para nossa nova casa. Ajude-nos a conquiStar esse item da nossa lista de casamento!",
-    pixKey: "julianam@email.com",
-    giftLink: "https://www.exemplo.com/aspirador-robot",
-    totalShares: 12,
-    boughtShares: 5
+    title: "Vaquinha Formatura",
+    type: "vaquinha",
+    date: "2025-08-05",
+    description: "Ajude-nos a realizar a festa de formatura da turma de Engenharia 2025!",
+    image: "https://images.unsplash.com/photo-1500375592092-40eb2168fd21",
+    progress: 25,
+    currentValue: 500,
+    targetValue: 2000,
+    pixKey: "formatura@example.com",
+    host: "Comissão de Formatura",
+    customColors: {
+      primaryColor: "#ADD8E6",
+      secondaryColor: "#1E90FF",
+      accentColor: "#87CEEB",
+      backgroundColor: "#F0F8FF"
+    },
+    suggestedValues: [50, 100, 200, 500]
   }
-];
+};
 
 const EventDetails = () => {
-  const { id } = useParams<{ id: string }>();
-  const [showPixInfo, setShowPixInfo] = useState(false);
-  const [participantInfo, setParticipantInfo] = useState({
+  const { id } = useParams();
+  const { toast } = useToast();
+  const [event, setEvent] = useState(null);
+  const [contribution, setContribution] = useState({
     name: "",
     email: "",
     value: "",
-    tickets: 1,
-    shares: 1
+    ticketCount: "1",
+    giftIndex: -1
   });
+  const [showPixInfo, setShowPixInfo] = useState(false);
 
-  // Find the event
-  const event = eventsData.find(e => e.id === id);
-
-  // Format date
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(date);
-  };
+  // Load event data based on ID
+  useEffect(() => {
+    if (id && mockEvents[id]) {
+      setEvent(mockEvents[id]);
+      
+      // Set default contribution value based on event type
+      if (mockEvents[id].type === "rifa") {
+        setContribution(prev => ({
+          ...prev,
+          value: String(mockEvents[id].ticketPrice)
+        }));
+      } else if (mockEvents[id].type === "vaquinha" && mockEvents[id].suggestedValues?.length > 0) {
+        setContribution(prev => ({
+          ...prev,
+          value: String(mockEvents[id].suggestedValues[0])
+        }));
+      }
+    }
+  }, [id]);
 
   if (!event) {
-    return (
-      <div className="py-16 mimo-container">
-        <Alert variant="destructive" className="mb-8">
-          <AlertDescription>
-            Evento não encontrado. O evento pode ter sido removido ou o link está incorreto.
-          </AlertDescription>
-        </Alert>
-        <Button asChild>
-          <a href="/events">Ver todos os eventos</a>
-        </Button>
-      </div>
-    );
+    return <div className="py-10 mimo-container">Carregando...</div>;
   }
 
-  const getEventIcon = (type: EventType) => {
-    switch (type) {
-      case "vaquinha":
-        return <PiggyBank className="h-5 w-5" />;
-      case "rifa":
-        return <Ticket className="h-5 w-5" />;
-      case "presente":
-        return <Gift className="h-5 w-5" />;
-    }
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setContribution(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const getBadgeColors = (type: EventType) => {
-    switch (type) {
-      case "vaquinha":
-        return "bg-accent text-accent-foreground";
-      case "rifa":
-        return "bg-secondary text-secondary-foreground";
-      case "presente":
-        return "bg-primary text-primary-foreground";
-    }
+  const handleGiftSelection = (index) => {
+    setContribution(prev => ({
+      ...prev,
+      giftIndex: index,
+      value: String(event.gifts[index].shareValue)
+    }));
   };
 
-  const handleParticipate = () => {
+  const handleSubmit = (e) => {
+    e.preventDefault();
     setShowPixInfo(true);
+    toast({
+      title: "Participação registrada!",
+      description: "Utilize o Pix exibido para concluir sua participação.",
+    });
+  };
+
+  // Get the correct component based on event type
+  const getEventTypeIcon = () => {
+    switch (event.type) {
+      case "presente":
+        return <Gift className="h-6 w-6" style={{ color: event.customColors?.secondaryColor }} />;
+      case "rifa":
+        return <Ticket className="h-6 w-6" style={{ color: event.customColors?.secondaryColor }} />;
+      case "vaquinha":
+        return <Percent className="h-6 w-6" style={{ color: event.customColors?.secondaryColor }} />;
+      default:
+        return <Gift className="h-6 w-6" />;
+    }
+  };
+
+  const getEventTypeLabel = () => {
+    switch (event.type) {
+      case "presente":
+        return "Lista de Presentes";
+      case "rifa":
+        return "Rifa";
+      case "vaquinha":
+        return "Vaquinha";
+      default:
+        return "Evento";
+    }
   };
 
   return (
-    <div className="py-10">
+    <div 
+      className="pt-6 pb-16"
+      style={{ 
+        backgroundColor: event.customColors?.backgroundColor || "var(--background)"
+      }}
+    >
       <div className="mimo-container">
         {/* Event header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <Badge className={`mb-2 ${getBadgeColors(event.type)} flex items-center gap-1 w-fit`}>
-              {getEventIcon(event.type)}
-              {event.type === "vaquinha" ? "Vaquinha" : event.type === "rifa" ? "Rifa" : "Presente Digital"}
-            </Badge>
-            <h1 className="text-3xl md:text-4xl font-bold">{event.title}</h1>
+        <div className="relative rounded-xl overflow-hidden shadow-lg mb-8">
+          <div className="h-64 w-full relative">
+            <img
+              src={event.image}
+              alt={event.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
+              <div className="p-6 text-white">
+                <div className="flex items-center gap-2 mb-2">
+                  {getEventTypeIcon()}
+                  <span className="text-sm font-medium">
+                    {getEventTypeLabel()}
+                  </span>
+                </div>
+                <h1 className="text-3xl font-bold">{event.title}</h1>
+                <p className="text-white/80 mt-2">
+                  Organizado por {event.host}
+                </p>
+              </div>
+            </div>
           </div>
-
-          <Button variant="outline" className="btn-icon w-fit">
-            <Share className="mr-2 h-4 w-4" />
-            Compartilhar
-          </Button>
         </div>
 
-        {/* Event content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main content - left 2/3 */}
+          {/* Main content */}
           <div className="lg:col-span-2">
-            <div className="rounded-lg overflow-hidden border border-border mb-6">
-              <img 
-                src={event.image} 
-                alt={event.title}
-                className="w-full h-[300px] md:h-[400px] object-cover"
-              />
-            </div>
-
-            <div className="flex items-center text-sm text-muted-foreground mb-6">
-              <User className="h-4 w-4 mr-1" />
-              <span>Criado por {event.creator}</span>
-              <span className="mx-2">•</span>
-              <Calendar className="h-4 w-4 mr-1" />
-              <span>Até {formatDate(event.endDate)}</span>
-            </div>
-
-            <div className="prose max-w-none">
-              <h2 className="text-2xl font-semibold mb-4">Sobre este evento</h2>
-              <p className="text-lg">{event.description}</p>
-            </div>
-
-            <Separator className="my-8" />
-
-            {/* Event-specific details */}
-            {event.type === "vaquinha" && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Detalhes da Vaquinha</h2>
-                <div className="bg-muted rounded-lg p-6 mb-6">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-lg">Meta</span>
-                    <span className="text-lg font-bold">R$ {event.goal.toLocaleString('pt-BR')}</span>
+            {/* Event information */}
+            <Card className="mb-8">
+              <CardHeader
+                className="pb-2"
+                style={{ backgroundColor: `${event.customColors?.primaryColor}15` }}
+              >
+                <CardTitle className="flex items-center">
+                  <div className="p-2 rounded-full mr-3" style={{ backgroundColor: `${event.customColors?.primaryColor}40` }}>
+                    {getEventTypeIcon()}
                   </div>
-                  <div className="flex justify-between mb-4">
-                    <span className="text-lg">Arrecadado</span>
-                    <span className="text-lg font-bold">R$ {event.progress.toLocaleString('pt-BR')}</span>
-                  </div>
-                  <div className="progress-container mb-2">
-                    <div 
-                      className="progress-bar bg-accent" 
-                      style={{ width: `${Math.min(Math.round((event.progress / event.goal) * 100), 100)}%` }}
-                    />
-                  </div>
-                  <div className="text-right text-sm font-medium">
-                    {Math.round((event.progress / event.goal) * 100)}% da meta
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {event.type === "rifa" && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Detalhes da Rifa</h2>
-                <div className="bg-muted rounded-lg p-6 mb-6">
-                  <div className="flex justify-between mb-3">
-                    <span className="text-lg">Prêmio</span>
-                    <span className="text-lg font-bold">{event.prize}</span>
-                  </div>
-                  <div className="flex justify-between mb-3">
-                    <span className="text-lg">Valor do bilhete</span>
-                    <span className="text-lg font-bold">R$ {event.ticketPrice.toLocaleString('pt-BR')}</span>
-                  </div>
-                  <div className="flex justify-between mb-3">
-                    <span className="text-lg">Total de bilhetes</span>
-                    <span className="text-lg font-bold">{event.totalTickets}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-lg">Bilhetes disponíveis</span>
-                    <span className="text-lg font-bold">{event.availableTickets}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {event.type === "presente" && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Detalhes do Presente</h2>
-                <div className="bg-muted rounded-lg p-6 mb-6">
-                  <div className="flex justify-between mb-3">
-                    <span className="text-lg">Valor total</span>
-                    <span className="text-lg font-bold">R$ {event.giftValue.toLocaleString('pt-BR')}</span>
-                  </div>
-                  <div className="flex justify-between mb-3">
-                    <span className="text-lg">Total de cotas</span>
-                    <span className="text-lg font-bold">{event.totalShares}</span>
-                  </div>
-                  <div className="flex justify-between mb-3">
-                    <span className="text-lg">Cotas adquiridas</span>
-                    <span className="text-lg font-bold">{event.boughtShares} de {event.totalShares}</span>
-                  </div>
-                  <div className="flex justify-between mb-4">
-                    <span className="text-lg">Valor por cota</span>
-                    <span className="text-lg font-bold">
-                      R$ {(event.giftValue / event.totalShares).toLocaleString('pt-BR')}
+                  {event.celebrationType ? `${event.celebrationType} de ${event.celebrationName}` : event.title}
+                </CardTitle>
+                <CardDescription>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>
+                      Encerra em: {new Date(event.date).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="progress-container mb-2">
-                    <div 
-                      className="progress-bar bg-primary" 
-                      style={{ width: `${Math.min(Math.round((event.boughtShares / event.totalShares) * 100), 100)}%` }}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="space-y-4">
+                  <p>{event.description}</p>
+                  
+                  {/* Progress information */}
+                  <div className="mt-6">
+                    <EventProgressBar
+                      type={event.type}
+                      progress={event.progress}
+                      currentValue={event.currentValue}
+                      targetValue={event.targetValue}
+                      endDate={event.date}
+                      customColors={event.customColors}
                     />
                   </div>
-                  <div className="text-right text-sm font-medium">
-                    {Math.round((event.boughtShares / event.totalShares) * 100)}% completo
+                  
+                  <div className="flex justify-end">
+                    <Button 
+                      variant="outline" 
+                      className="flex items-center"
+                      onClick={() => {
+                        navigator.share({
+                          title: event.title,
+                          text: event.description,
+                          url: window.location.href
+                        }).catch(err => console.log('Error sharing', err));
+                      }}
+                    >
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Compartilhar
+                    </Button>
                   </div>
                 </div>
-                {event.giftLink && (
-                  <div className="mt-4">
-                    <a 
-                      href={event.giftLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-secondary underline hover:text-secondary/90"
-                    >
-                      Ver produto em loja online
-                    </a>
+              </CardContent>
+            </Card>
+
+            {/* Event specific content */}
+            {event.type === "presente" && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Lista de Presentes</CardTitle>
+                  <CardDescription>
+                    Escolha um presente para contribuir
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {event.gifts.map((gift, index) => (
+                      <div 
+                        key={index} 
+                        className={`border rounded-lg p-4 transition-all ${
+                          contribution.giftIndex === index ? 
+                            'border-2 border-secondary' : 
+                            'hover:border-muted-foreground'
+                        }`}
+                        onClick={() => handleGiftSelection(index)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium">{gift.name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Valor total: R$ {gift.value.toFixed(2)} • {gift.shares} cotas de R$ {gift.shareValue.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <Button 
+                              variant={contribution.giftIndex === index ? "default" : "outline"} 
+                              size="sm"
+                              style={contribution.giftIndex === index ? { backgroundColor: event.customColors.secondaryColor } : {}}
+                            >
+                              {contribution.giftIndex === index ? (
+                                <>
+                                  <Check className="mr-1 h-4 w-4" />
+                                  Selecionado
+                                </>
+                              ) : (
+                                'Selecionar'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <div className="w-full h-2 rounded-full overflow-hidden bg-gray-200">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ 
+                                width: `${(gift.sharesTaken / gift.shares) * 100}%`,
+                                backgroundColor: event.customColors.secondaryColor
+                              }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between text-xs mt-1">
+                            <span>{gift.sharesTaken} de {gift.shares} cotas</span>
+                            <span>{((gift.sharesTaken / gift.shares) * 100).toFixed(0)}% completo</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {event.type === "rifa" && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Informações da Rifa</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-lg bg-muted">
+                      <h3 className="font-medium mb-2">Prêmio</h3>
+                      <p>{event.prize}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-lg bg-muted">
+                        <h3 className="font-medium">Valor do Bilhete</h3>
+                        <p className="text-lg font-semibold">R$ {event.ticketPrice.toFixed(2)}</p>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg bg-muted">
+                        <h3 className="font-medium">Bilhetes Disponíveis</h3>
+                        <p className="text-lg font-semibold">
+                          {event.targetValue - event.currentValue} de {event.targetValue}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 rounded-lg border">
+                      <h3 className="font-medium mb-2">Sorteio</h3>
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        <span>Data: {new Date(event.date).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {event.type === "vaquinha" && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Sobre esta Vaquinha</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <p className="text-muted-foreground">
+                      Toda contribuição é importante! Escolha um valor ou defina um personalizado.
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {event.suggestedValues.map((value, index) => (
+                        <button 
+                          key={index}
+                          className={`px-4 py-2 rounded-lg border transition-all ${
+                            contribution.value === String(value) ? 'bg-secondary text-secondary-foreground' : ''
+                          }`}
+                          style={contribution.value === String(value) ? { backgroundColor: event.customColors.secondaryColor, color: 'white' } : {}}
+                          onClick={() => setContribution(prev => ({ ...prev, value: String(value) }))}
+                        >
+                          R$ {value.toFixed(2)}
+                        </button>
+                      ))}
+                      <button 
+                        className={`px-4 py-2 rounded-lg border transition-all ${
+                          !event.suggestedValues.includes(Number(contribution.value)) ? 'bg-secondary text-secondary-foreground' : ''
+                        }`}
+                        style={!event.suggestedValues.includes(Number(contribution.value)) ? { backgroundColor: event.customColors.secondaryColor, color: 'white' } : {}}
+                        onClick={() => setContribution(prev => ({ ...prev, value: '' }))}
+                      >
+                        Outro valor
+                      </button>
+                    </div>
+                    
+                    {!event.suggestedValues.includes(Number(contribution.value)) && (
+                      <div className="mt-4">
+                        <Label htmlFor="customValue">Valor personalizado</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5">R$</span>
+                          <Input
+                            id="customValue"
+                            name="value"
+                            type="number"
+                            placeholder="0,00"
+                            className="pl-10"
+                            value={contribution.value}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
 
-          {/* Sidebar - right 1/3 */}
+          {/* Participation form */}
           <div className="lg:col-span-1">
-            <div className="bg-card rounded-lg border border-border p-6 sticky top-20">
-              <h2 className="text-xl font-semibold mb-4">Participar deste evento</h2>
-              
-              {!showPixInfo ? (
-                <>
-                  <form className="space-y-4 mb-6">
-                    <div>
-                      <Label htmlFor="name">Nome</Label>
-                      <Input 
-                        id="name" 
-                        placeholder="Seu nome"
-                        value={participantInfo.name}
-                        onChange={(e) => setParticipantInfo({...participantInfo, name: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="email">E-mail</Label>
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        placeholder="seu-email@exemplo.com"
-                        value={participantInfo.email}
-                        onChange={(e) => setParticipantInfo({...participantInfo, email: e.target.value})}
-                      />
-                    </div>
-
-                    {event.type === "vaquinha" && (
-                      <div>
-                        <Label htmlFor="value">Valor da contribuição</Label>
-                        <Input 
-                          id="value" 
-                          type="number" 
-                          placeholder="R$ 0,00"
-                          min="1"
-                          value={participantInfo.value}
-                          onChange={(e) => setParticipantInfo({...participantInfo, value: e.target.value})}
+            <div className="lg:sticky lg:top-24">
+              <Card>
+                <CardHeader
+                  style={{ backgroundColor: `${event.customColors?.secondaryColor}20` }}
+                >
+                  <CardTitle className="text-lg">Participar</CardTitle>
+                  <CardDescription>
+                    Preencha seus dados para contribuir
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {!showPixInfo ? (
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Seu nome</Label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="name"
+                            name="name"
+                            placeholder="Nome completo"
+                            className="pl-10"
+                            value={contribution.name}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Seu e-mail</Label>
+                        <Input
+                          id="email"
+                          name="email"
+                          type="email"
+                          placeholder="email@exemplo.com"
+                          value={contribution.email}
+                          onChange={handleInputChange}
+                          required
                         />
                       </div>
-                    )}
-
-                    {event.type === "rifa" && (
-                      <div>
-                        <Label htmlFor="tickets">Quantidade de bilhetes</Label>
-                        <div className="flex items-center">
-                          <Input 
-                            id="tickets" 
-                            type="number" 
-                            min="1"
-                            max={event.availableTickets}
-                            value={participantInfo.tickets}
-                            onChange={(e) => setParticipantInfo({...participantInfo, tickets: parseInt(e.target.value)})}
-                          />
-                          <div className="ml-3">
-                            <p className="font-medium">
-                              R$ {(event.ticketPrice * participantInfo.tickets).toLocaleString('pt-BR')}
-                            </p>
+                      
+                      {event.type === "rifa" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="ticketCount">Quantidade de bilhetes</Label>
+                          <div className="flex items-center gap-3">
+                            <Input
+                              id="ticketCount"
+                              name="ticketCount"
+                              type="number"
+                              min="1"
+                              value={contribution.ticketCount}
+                              onChange={handleInputChange}
+                              required
+                            />
+                            <div className="text-muted-foreground">
+                              x R$ {event.ticketPrice.toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="text-right font-medium">
+                            Total: R$ {(Number(contribution.ticketCount) * event.ticketPrice).toFixed(2)}
                           </div>
                         </div>
-                      </div>
-                    )}
-
-                    {event.type === "presente" && (
-                      <div>
-                        <Label htmlFor="shares">Quantidade de cotas</Label>
-                        <div className="flex items-center">
-                          <Input 
-                            id="shares" 
-                            type="number" 
-                            min="1"
-                            max={event.totalShares - event.boughtShares}
-                            value={participantInfo.shares}
-                            onChange={(e) => setParticipantInfo({...participantInfo, shares: parseInt(e.target.value)})}
-                          />
-                          <div className="ml-3">
-                            <p className="font-medium">
-                              R$ {((event.giftValue / event.totalShares) * participantInfo.shares).toLocaleString('pt-BR')}
-                            </p>
-                          </div>
+                      )}
+                      
+                      {event.type === "presente" && contribution.giftIndex === -1 && (
+                        <div className="p-4 bg-muted/50 rounded-lg text-center text-sm">
+                          Por favor, selecione um presente da lista acima para continuar.
                         </div>
+                      )}
+                      
+                      <Button 
+                        type="submit" 
+                        className="w-full"
+                        disabled={event.type === "presente" && contribution.giftIndex === -1}
+                        style={{ backgroundColor: event.customColors.secondaryColor }}
+                      >
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Confirmar Participação
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="p-4 rounded-lg bg-muted/50 text-center space-y-2">
+                        <Key className="mx-auto h-8 w-8 text-muted-foreground" />
+                        <p className="font-medium">Chave Pix</p>
+                        <p className="text-sm">{event.pixKey}</p>
                       </div>
-                    )}
-                  </form>
-
-                  <Button 
-                    className="w-full btn-secondary" 
-                    onClick={handleParticipate}
-                  >
-                    Participar
-                  </Button>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <Alert className="bg-muted border-accent">
-                    <AlertDescription>
-                      Escaneie o QR Code ou copie a chave Pix abaixo para realizar o pagamento.
-                    </AlertDescription>
-                  </Alert>
-                  
-                  <div className="mb-6 bg-white p-4 rounded-lg border border-border text-center">
-                    {/* Simulated QR Code */}
-                    <div className="mb-4 w-48 h-48 mx-auto bg-gray-200 rounded-md flex items-center justify-center">
-                      <span className="text-xs text-muted-foreground">QR Code Pix</span>
+                      
+                      <div className="text-center">
+                        <p className="font-medium">Valor a transferir</p>
+                        <p className="text-xl mt-1">
+                          R$ {event.type === "rifa" 
+                            ? (Number(contribution.ticketCount) * event.ticketPrice).toFixed(2) 
+                            : Number(contribution.value).toFixed(2)}
+                        </p>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg border bg-muted/20 text-sm">
+                        <p>
+                          <strong>Importante:</strong> Após realizar o pagamento via Pix, o organizador irá confirmar sua participação manualmente.
+                        </p>
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => setShowPixInfo(false)}
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        Voltar
+                      </Button>
                     </div>
-                    
-                    <div className="text-center mb-4">
-                      <p className="text-sm text-muted-foreground mb-1">Chave Pix</p>
-                      <p className="font-medium text-sm bg-muted p-2 rounded">{event.pixKey}</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-1">Valor</p>
-                      <p className="font-bold text-lg">
-                        {event.type === "vaquinha" && `R$ ${participantInfo.value}`}
-                        {event.type === "rifa" && `R$ ${(event.ticketPrice * participantInfo.tickets).toLocaleString('pt-BR')}`}
-                        {event.type === "presente" && `R$ ${((event.giftValue / event.totalShares) * participantInfo.shares).toLocaleString('pt-BR')}`}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    Após o pagamento, o criador do evento confirmará manualmente sua participação. Você receberá uma notificação por e-mail.
-                  </p>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => setShowPixInfo(false)}
-                  >
-                    Voltar
-                  </Button>
-                </div>
-              )}
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
